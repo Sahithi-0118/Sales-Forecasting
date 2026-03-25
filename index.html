@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sales Forecasting Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── Reset & Tokens ────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0e14;
+      --surface:   #131720;
+      --card:      #1a2030;
+      --border:    #252d3d;
+      --accent:    #00e5c8;
+      --accent2:   #ff6b6b;
+      --gold:      #ffd166;
+      --text:      #e8edf5;
+      --muted:     #7a8599;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --radius:    12px;
+      --shadow:    0 4px 32px rgba(0,0,0,.45);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-head);
+      min-height: 100vh;
+      padding: 0 0 60px;
+    }
+
+    /* ── Header ────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 22px 48px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo-dot {
+      width: 14px; height: 14px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--accent);
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: var(--text);
+    }
+    header span {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      color: var(--muted);
+      background: var(--card);
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Layout ────────────────────────────────── */
+    main { max-width: 1200px; margin: 0 auto; padding: 40px 24px 0; }
+
+    .hero {
+      margin-bottom: 40px;
+    }
+    .hero h2 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -.01em;
+    }
+    .hero h2 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+    .hero p {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: .92rem;
+      font-weight: 400;
+      font-family: var(--font-mono);
+      max-width: 560px;
+    }
+
+    /* ── Stat Cards ────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s, transform .2s;
+    }
+    .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent-bar, var(--accent));
+    }
+    .stat-card.red   { --accent-bar: var(--accent2); }
+    .stat-card.gold  { --accent-bar: var(--gold); }
+    .stat-card.blue  { --accent-bar: #6fa8ff; }
+
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -.02em;
+    }
+    .stat-sub {
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      margin-top: 4px;
+    }
+    .up   { color: var(--accent); }
+    .down { color: var(--accent2); }
+
+    /* ── Chart Card ────────────────────────────── */
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 28px 20px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+    .chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .chart-title { font-size: 1rem; font-weight: 700; letter-spacing: .02em; }
+    .chart-sub   { font-family: var(--font-mono); font-size: .72rem; color: var(--muted); margin-top: 3px; }
+
+    .legend {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 7px;
+      font-family: var(--font-mono); font-size: .72rem; color: var(--muted);
+    }
+    .legend-dot {
+      width: 28px; height: 3px; border-radius: 2px;
+    }
+    .legend-dot.dashed {
+      background: repeating-linear-gradient(
+        90deg, var(--c) 0, var(--c) 6px, transparent 6px, transparent 10px
+      );
+    }
+
+    .chart-wrap { position: relative; height: 320px; }
+
+    /* ── Method Selector ───────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+      align-items: center;
+    }
+    .controls label {
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      color: var(--muted);
+      letter-spacing: .06em;
+    }
+    .btn-group {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-group button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--font-head);
+      font-size: .8rem;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-group button.active,
+    .btn-group button:hover {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+
+    .period-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+      margin-left: auto;
+    }
+
+    /* ── Data Table ────────────────────────────── */
+    .table-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media(max-width: 700px) { .table-grid { grid-template-columns: 1fr; } }
+
+    .table-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      overflow: hidden;
+    }
+    .table-card h3 {
+      font-size: .9rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      letter-spacing: .03em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: .76rem;
+    }
+    thead th {
+      color: var(--muted);
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: .06em;
+      font-size: .68rem;
+    }
+    tbody tr:hover td { background: rgba(255,255,255,.03); }
+    tbody td {
+      padding: 7px 8px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      color: var(--text);
+    }
+    .fc-val { color: var(--accent); font-weight: 500; }
+    .growth-pos { color: var(--accent); }
+    .growth-neg { color: var(--accent2); }
+
+    /* ── Custom Data Section ───────────────────── */
+    .input-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .input-section h3 {
+      font-size: .95rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .input-section p {
+      font-family: var(--font-mono);
+      font-size: .73rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .field label {
+      font-family: var(--font-mono);
+      font-size: .68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .field input, .field textarea {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      padding: 9px 14px;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field textarea:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 80px; width: 340px; max-width: 100%; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: .85rem;
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      align-self: flex-end;
+    }
+    .btn-primary:hover { opacity: .85; transform: translateY(-1px); }
+
+    .btn-reset {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      font-family: var(--font-head);
+      font-size: .82rem;
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      align-self: flex-end;
+      transition: border-color .15s;
+    }
+    .btn-reset:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    .error-msg {
+      color: var(--accent2);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      margin-top: 10px;
+      display: none;
+    }
+
+    /* ── Footer ────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 40px 24px 0;
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    footer span { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ───────────── HEADER ───────────── -->
+<header>
+  <div class="logo-dot"></div>
+  <h1>FORECAST<em style="color:var(--accent)">LENS</em></h1>
+  <span id="live-date">Loading…</span>
+</header>
+
+<!-- ───────────── MAIN ───────────── -->
+<main>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h2>Sales <em>Forecasting</em><br>Dashboard</h2>
+    <p>// Visualise historical trends · predict future revenue · powered by moving average & linear regression</p>
+  </section>
+
+  <!-- KPI Cards -->
+  <div class="stats" id="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Actual Sales</div>
+      <div class="stat-value" id="kpi-total">—</div>
+      <div class="stat-sub muted" id="kpi-months">— months of data</div>
+    </div>
+    <div class="stat-card gold">
+      <div class="stat-label">Avg Monthly Sales</div>
+      <div class="stat-value" id="kpi-avg">—</div>
+      <div class="stat-sub muted">historical average</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">Next Month Forecast</div>
+      <div class="stat-value" id="kpi-next">—</div>
+      <div class="stat-sub" id="kpi-delta">—</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Forecast Horizon</div>
+      <div class="stat-value" id="kpi-horizon">—</div>
+      <div class="stat-sub muted">months projected</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <label>METHOD //</label>
+    <div class="btn-group">
+      <button id="btn-ma" class="active" onclick="setMethod('ma')">Moving Average</button>
+      <button id="btn-lr" onclick="setMethod('lr')">Linear Regression</button>
+    </div>
+    <select class="period-select" id="ma-period" onchange="renderAll()" title="Moving average window">
+      <option value="3">MA-3</option>
+      <option value="4" selected>MA-4</option>
+      <option value="6">MA-6</option>
+    </select>
+    <select class="period-select" id="horizon-select" onchange="renderAll()">
+      <option value="3">3-month forecast</option>
+      <option value="6" selected>6-month forecast</option>
+      <option value="12">12-month forecast</option>
+    </select>
+  </div>
+
+  <!-- Main Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Actual vs Forecasted Sales</div>
+        <div class="chart-sub" id="chart-sub-title">Moving Average (window = 4)</div>
+      </div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--accent)"></div>
+          Actual Sales
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot dashed" style="--c:var(--gold)"></div>
+          Forecast
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot dashed" style="--c:rgba(255,107,107,.6); opacity:.5"></div>
+          CI Band
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+  </div>
+
+  <!-- Growth Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Month-over-Month Growth (%)</div>
+        <div class="chart-sub">Percentage change in sales per month</div>
+      </div>
+    </div>
+    <div class="chart-wrap" style="height:200px"><canvas id="growthChart"></canvas></div>
+  </div>
+
+  <!-- Tables -->
+  <div class="table-grid">
+    <div class="table-card">
+      <h3>📊 Historical Data</h3>
+      <table>
+        <thead><tr><th>#</th><th>Month</th><th>Sales ($)</th><th>MoM Δ</th></tr></thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+    </div>
+    <div class="table-card">
+      <h3>🔮 Forecast Table</h3>
+      <table>
+        <thead><tr><th>#</th><th>Month</th><th>Predicted ($)</th><th>Δ vs Last</th></tr></thead>
+        <tbody id="fc-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Custom Data Input -->
+  <div class="input-section">
+    <h3>⚙️ Enter Your Own Data</h3>
+    <p>// Paste comma-separated monthly sales values and optional month labels to override the sample dataset</p>
+    <div class="input-row">
+      <div class="field">
+        <label>Sales Values (comma-separated)</label>
+        <textarea id="custom-values" placeholder="e.g. 12000, 13500, 11800, 15200, 16700, 14900…"></textarea>
+      </div>
+      <div class="field">
+        <label>Month Labels (optional)</label>
+        <textarea id="custom-labels" placeholder="e.g. Jan 24, Feb 24, Mar 24…"></textarea>
+      </div>
+      <button class="btn-primary" onclick="applyCustomData()">Apply Data</button>
+      <button class="btn-reset" onclick="resetData()">Reset</button>
+    </div>
+    <div class="error-msg" id="err-msg"></div>
+  </div>
+
+</main>
+
+<footer>
+  Built with <span>Chart.js</span> · Forecasting via Moving Average & Linear Regression ·
+  <span>ForecastLens</span> — Student Mini Project
+</footer>
+
+<!-- ───────────── SCRIPT ───────────── -->
+<script>
+/* ════════════════════════════════════════════════
+   SALES FORECASTING DASHBOARD
+   Techniques: Moving Average · Linear Regression
+   Visualisation: Chart.js 4
+   ════════════════════════════════════════════════ */
+
+// ── 1. SAMPLE DATASET ──────────────────────────
+const SAMPLE_LABELS = [
+  'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23',
+  'Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+  'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24',
+  'Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24'
+];
+
+const SAMPLE_VALUES = [
+  18400, 17200, 19800, 21500, 23100, 22400,
+  24600, 25800, 23900, 27200, 30100, 34500,
+  29800, 28300, 31200, 33400, 35700, 34100,
+  36800, 38200, 36500, 40100, 44300, 49200
+];
+
+// Active dataset (can be overridden by user input)
+let activeLabels = [...SAMPLE_LABELS];
+let activeValues = [...SAMPLE_VALUES];
+let method = 'ma'; // 'ma' | 'lr'
+
+// Chart instances
+let mainChartInstance = null;
+let growthChartInstance = null;
+
+
+// ── 2. FORECASTING UTILITIES ───────────────────
+
+/**
+ * Moving Average Forecast
+ * @param {number[]} data   – historical values
+ * @param {number}   window – look-back period
+ * @param {number}   steps  – how many future points to predict
+ * @returns {{ values: number[], ci: number[] }}  forecasted values + half-CI
+ */
+function movingAverageForecast(data, window, steps) {
+  if (data.length < window) throw new Error(`Need at least ${window} data points for MA-${window}.`);
+
+  const results = [];
+  const working = [...data];
+
+  // Standard deviation of last window values for a crude CI band
+  const lastSlice = data.slice(-window);
+  const mean = lastSlice.reduce((a,b) => a+b, 0) / window;
+  const variance = lastSlice.reduce((s,v) => s + (v-mean)**2, 0) / window;
+  const sd = Math.sqrt(variance);
+
+  for (let i = 0; i < steps; i++) {
+    const slice = working.slice(-window);
+    const avg = slice.reduce((a,b) => a+b, 0) / slice.length;
+    results.push(Math.round(avg));
+    working.push(avg);  // use forecast value for next iteration
+  }
+
+  return { values: results, ci: results.map(() => Math.round(sd * 1.645)) };
+}
+
+/**
+ * Linear Regression Forecast (Ordinary Least Squares)
+ * y = mx + b   where x = month index
+ * @param {number[]} data  – historical values
+ * @param {number}   steps – future steps
+ * @returns {{ values: number[], ci: number[] }}
+ */
+function linearRegressionForecast(data, steps) {
+  const n = data.length;
+  const xs = data.map((_, i) => i);      // [0,1,2,…]
+  const ys = data;
+
+  const sumX  = xs.reduce((a,b) => a+b, 0);
+  const sumY  = ys.reduce((a,b) => a+b, 0);
+  const sumXY = xs.reduce((a,x,i) => a + x*ys[i], 0);
+  const sumX2 = xs.reduce((a,x) => a + x*x, 0);
+
+  const slope     = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX**2);
+  const intercept = (sumY - slope*sumX) / n;
+
+  // Residual std error for CI
+  const residuals = ys.map((y,i) => y - (slope*i + intercept));
+  const sse = residuals.reduce((s,r) => s + r**2, 0);
+  const se  = Math.sqrt(sse / (n-2));
+
+  const values = [];
+  for (let i = n; i < n + steps; i++) {
+    values.push(Math.round(slope*i + intercept));
+  }
+
+  return { values, ci: values.map(() => Math.round(se * 1.96)) };
+}
+
+/**
+ * Month-over-month growth array (%)
+ */
+function computeGrowth(values) {
+  return values.map((v,i) =>
+    i === 0 ? null : +((v - values[i-1]) / values[i-1] * 100).toFixed(1)
+  );
+}
+
+/**
+ * Generate future month labels
+ */
+function generateFutureLabels(lastLabel, count) {
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const parts = lastLabel.split(' ');
+  let mIdx = monthNames.indexOf(parts[0]);
+  let yr   = parseInt(parts[1]) || new Date().getFullYear();
+
+  const labels = [];
+  for (let i = 0; i < count; i++) {
+    mIdx++;
+    if (mIdx > 11) { mIdx = 0; yr++; }
+    labels.push(`${monthNames[mIdx]} ${yr}`);
+  }
+  return labels;
+}
+
+
+// ── 3. RENDER PIPELINE ─────────────────────────
+
+function renderAll() {
+  try {
+    const horizon = parseInt(document.getElementById('horizon-select').value);
+    const maPeriod = parseInt(document.getElementById('ma-period').value);
+
+    // Run selected forecast method
+    let forecast, methodLabel;
+    if (method === 'ma') {
+      forecast    = movingAverageForecast(activeValues, maPeriod, horizon);
+      methodLabel = `Moving Average (window = ${maPeriod})`;
+    } else {
+      forecast    = linearRegressionForecast(activeValues, horizon);
+      methodLabel = 'Linear Regression (OLS)';
+    }
+
+    const futureLabels = generateFutureLabels(activeLabels[activeLabels.length - 1], horizon);
+    const allLabels    = [...activeLabels, ...futureLabels];
+
+    // Chart datasets
+    const actualData     = [...activeValues, ...Array(horizon).fill(null)];
+    const forecastData   = [...Array(activeValues.length - 1).fill(null), activeValues[activeValues.length-1], ...forecast.values];
+    const upperCI        = forecastData.map((v,i) => v !== null && i >= activeValues.length - 1 ? v + forecast.ci[Math.max(i - activeValues.length + 1, 0)] : null);
+    const lowerCI        = forecastData.map((v,i) => v !== null && i >= activeValues.length - 1 ? v - forecast.ci[Math.max(i - activeValues.length + 1, 0)] : null);
+
+    document.getElementById('chart-sub-title').textContent = methodLabel;
+
+    renderMainChart(allLabels, actualData, forecastData, upperCI, lowerCI);
+    renderGrowthChart(activeLabels, computeGrowth(activeValues));
+    updateKPIs(forecast.values, horizon);
+    updateTables(forecast.values, futureLabels);
+  } catch(e) {
+    showError(e.message);
+  }
+}
+
+function renderMainChart(labels, actual, forecast, upper, lower) {
+  if (mainChartInstance) mainChartInstance.destroy();
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+
+  // Gradient fill for actual line
+  const gradActual = ctx.createLinearGradient(0, 0, 0, 300);
+  gradActual.addColorStop(0, 'rgba(0,229,200,.22)');
+  gradActual.addColorStop(1, 'rgba(0,229,200,0)');
+
+  const gradFC = ctx.createLinearGradient(0, 0, 0, 300);
+  gradFC.addColorStop(0, 'rgba(255,209,102,.12)');
+  gradFC.addColorStop(1, 'rgba(255,209,102,0)');
+
+  mainChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        // CI upper
+        { label: 'CI Upper', data: upper, borderWidth:0, pointRadius:0,
+          backgroundColor:'rgba(255,107,107,.12)', fill:'+1', tension:.35 },
+        // CI lower
+        { label: 'CI Lower', data: lower, borderWidth:0, pointRadius:0,
+          backgroundColor:'rgba(255,107,107,.12)', fill:false, tension:.35 },
+        // Actual
+        { label:'Actual Sales', data: actual,
+          borderColor:'#00e5c8', borderWidth:2.5,
+          backgroundColor: gradActual, fill:true,
+          pointBackgroundColor:'#00e5c8', pointRadius:3.5, pointHoverRadius:6,
+          tension:.35 },
+        // Forecast
+        { label:'Forecast', data: forecast,
+          borderColor:'#ffd166', borderWidth:2.5, borderDash:[7,4],
+          backgroundColor: gradFC, fill:true,
+          pointBackgroundColor:'#ffd166', pointRadius:3.5, pointHoverRadius:6,
+          tension:.35 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          backgroundColor:'#1a2030',
+          borderColor:'#252d3d',
+          borderWidth:1,
+          titleColor:'#7a8599',
+          bodyColor:'#e8edf5',
+          padding:12,
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.label.startsWith('CI')) return null;
+              const v = ctx.parsed.y;
+              return v !== null ? `  ${ctx.dataset.label}: $${v.toLocaleString()}` : null;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color:'#7a8599', font:{ family:'DM Mono', size:10 }, maxTicksLimit:14 },
+          grid:  { color:'rgba(255,255,255,.05)' }
+        },
+        y: {
+          ticks: { color:'#7a8599', font:{ family:'DM Mono', size:10 },
+            callback: v => '$' + (v/1000).toFixed(0) + 'k' },
+          grid: { color:'rgba(255,255,255,.05)' }
+        }
+      }
+    }
+  });
+}
+
+function renderGrowthChart(labels, growth) {
+  if (growthChartInstance) growthChartInstance.destroy();
+
+  const ctx = document.getElementById('growthChart').getContext('2d');
+  const colors = growth.map(v => v === null ? 'transparent' : v >= 0 ? 'rgba(0,229,200,.75)' : 'rgba(255,107,107,.75)');
+
+  growthChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'MoM Growth %',
+        data: growth,
+        backgroundColor: colors,
+        borderRadius: 4,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor:'#1a2030', borderColor:'#252d3d', borderWidth:1,
+          titleColor:'#7a8599', bodyColor:'#e8edf5',
+          callbacks: { label: ctx => `  Growth: ${ctx.parsed.y}%` }
+        }
+      },
+      scales: {
+        x: { ticks:{ color:'#7a8599', font:{ family:'DM Mono', size:10 }, maxTicksLimit:14 },
+             grid:{ display:false } },
+        y: { ticks:{ color:'#7a8599', font:{ family:'DM Mono', size:10 },
+               callback: v => v+'%' }, grid:{ color:'rgba(255,255,255,.05)' } }
+      }
+    }
+  });
+}
+
+function updateKPIs(forecastVals, horizon) {
+  const total = activeValues.reduce((a,b)=>a+b,0);
+  const avg   = Math.round(total / activeValues.length);
+  const last  = activeValues[activeValues.length-1];
+  const next  = forecastVals[0];
+  const delta = (((next - last) / last) * 100).toFixed(1);
+  const deltaClass = delta >= 0 ? 'up' : 'down';
+
+  document.getElementById('kpi-total').textContent   = '$' + total.toLocaleString();
+  document.getElementById('kpi-months').textContent  = activeValues.length + ' months of data';
+  document.getElementById('kpi-avg').textContent     = '$' + avg.toLocaleString();
+  document.getElementById('kpi-next').textContent    = '$' + next.toLocaleString();
+  document.getElementById('kpi-delta').innerHTML     = `<span class="${deltaClass}">${delta >= 0 ? '+':''}${delta}%</span> vs last month`;
+  document.getElementById('kpi-horizon').textContent = horizon + 'mo';
+}
+
+function updateTables(forecastVals, futureLabels) {
+  // Historical table
+  const histBody = document.getElementById('hist-tbody');
+  histBody.innerHTML = '';
+  activeValues.forEach((v,i) => {
+    const prev  = activeValues[i-1];
+    const delta = prev ? ((v-prev)/prev*100).toFixed(1) : '—';
+    const cls   = delta !== '—' ? (parseFloat(delta) >= 0 ? 'growth-pos' : 'growth-neg') : '';
+    histBody.innerHTML += `<tr>
+      <td>${i+1}</td>
+      <td>${activeLabels[i]}</td>
+      <td>$${v.toLocaleString()}</td>
+      <td class="${cls}">${delta !== '—' ? (parseFloat(delta)>=0?'+':'')+delta+'%' : '—'}</td>
+    </tr>`;
+  });
+
+  // Forecast table
+  const fcBody = document.getElementById('fc-tbody');
+  fcBody.innerHTML = '';
+  const lastActual = activeValues[activeValues.length-1];
+  forecastVals.forEach((v,i) => {
+    const prev  = i === 0 ? lastActual : forecastVals[i-1];
+    const delta = ((v-prev)/prev*100).toFixed(1);
+    const cls   = parseFloat(delta) >= 0 ? 'growth-pos' : 'growth-neg';
+    fcBody.innerHTML += `<tr>
+      <td>${i+1}</td>
+      <td>${futureLabels[i]}</td>
+      <td class="fc-val">$${v.toLocaleString()}</td>
+      <td class="${cls}">${parseFloat(delta)>=0?'+':''}${delta}%</td>
+    </tr>`;
+  });
+}
+
+
+// ── 4. USER INPUT HANDLING ─────────────────────
+
+function applyCustomData() {
+  hideError();
+  const rawVals   = document.getElementById('custom-values').value.trim();
+  const rawLabels = document.getElementById('custom-labels').value.trim();
+
+  if (!rawVals) { showError('Please enter at least some sales values.'); return; }
+
+  // Parse values
+  const vals = rawVals.split(',').map(s => {
+    const n = parseFloat(s.trim().replace(/[$,]/g,''));
+    return isNaN(n) ? null : n;
+  }).filter(v => v !== null);
+
+  if (vals.length < 4) { showError('Please enter at least 4 data points.'); return; }
+
+  // Parse labels (or auto-generate)
+  let labels;
+  if (rawLabels) {
+    labels = rawLabels.split(',').map(s => s.trim());
+    if (labels.length !== vals.length) {
+      showError(`Label count (${labels.length}) doesn't match value count (${vals.length}). Leave labels blank for auto-generation.`);
+      return;
+    }
+  } else {
+    labels = vals.map((_,i) => `Month ${i+1}`);
+  }
+
+  activeValues = vals;
+  activeLabels = labels;
+  renderAll();
+}
+
+function resetData() {
+  activeValues = [...SAMPLE_VALUES];
+  activeLabels = [...SAMPLE_LABELS];
+  document.getElementById('custom-values').value = '';
+  document.getElementById('custom-labels').value = '';
+  hideError();
+  renderAll();
+}
+
+function setMethod(m) {
+  method = m;
+  document.getElementById('btn-ma').classList.toggle('active', m === 'ma');
+  document.getElementById('btn-lr').classList.toggle('active', m === 'lr');
+  document.getElementById('ma-period').disabled = m !== 'ma';
+  renderAll();
+}
+
+function showError(msg) {
+  const el = document.getElementById('err-msg');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('err-msg').style.display = 'none';
+}
+
+
+// ── 5. LIVE DATE ───────────────────────────────
+function setLiveDate() {
+  const d = new Date();
+  document.getElementById('live-date').textContent =
+    d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+
+// ── 6. BOOT ────────────────────────────────────
+setLiveDate();
+renderAll();
+</script>
+</body>
+</html>
